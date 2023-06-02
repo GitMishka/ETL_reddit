@@ -3,7 +3,7 @@ import pandas as pd
 import time
 import psycopg2
 import config  
-import request
+import requests
 
 user_agent = config.reddit_username
 reddit = praw.Reddit(
@@ -22,6 +22,10 @@ conn = psycopg2.connect(
     password=config.pg_password
 )
 cur = conn.cursor()
+# After establishing the connection and getting the cursor
+# cur.execute("""
+#     DROP TABLE IF EXISTS reddit_posts;
+# """)
 cur.execute("""
     CREATE TABLE IF NOT EXISTS reddit_posts (
         post_id TEXT PRIMARY KEY,
@@ -30,8 +34,12 @@ cur.execute("""
         post_upvote_ratio REAL,
         post_comments INT,
         post_timeposted TIMESTAMP
-    )
+    );
 """)
+conn.commit()  # Explicit commit after table creation
+
+
+import datetime
 
 def fetch_data():
     # Fetch the top 100 posts from /r/all
@@ -47,13 +55,14 @@ def fetch_data():
             'subreddit': post.subreddit.display_name,
             'post_upvote_ratio': post.upvote_ratio,
             'post_comments': post.num_comments,
-            'post_timeposted': post.created_utc,
+            'post_timeposted': datetime.datetime.utcfromtimestamp(post.created_utc),
         }
         posts_list.append(content)
     
     # Convert list of posts into a DataFrame
     posts_df = pd.DataFrame(posts_list)
     return posts_df
+
 
 def upsert_post(post):
     # Upsert post into the PostgreSQL database
