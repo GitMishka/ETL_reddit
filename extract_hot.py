@@ -27,7 +27,7 @@ cur = conn.cursor()
 #     DROP TABLE IF EXISTS reddit_posts;
 # """)
 cur.execute("""
-    CREATE TABLE IF NOT EXISTS reddit_posts (
+    CREATE TABLE IF NOT EXISTS reddit_posts_hot (
         post_id TEXT PRIMARY KEY,
         post_title TEXT,
         subreddit TEXT,
@@ -67,7 +67,7 @@ def fetch_data():
 def upsert_post(post):
     # Upsert post into the PostgreSQL database
     insert = """
-    INSERT INTO reddit_posts(post_id, post_title, subreddit, post_upvote_ratio, post_comments, post_timeposted) 
+    INSERT INTO reddit_posts_hot(post_id, post_title, subreddit, post_upvote_ratio, post_comments, post_timeposted) 
     VALUES(%s, %s, %s, %s, %s, %s) 
     ON CONFLICT (post_id) 
     DO UPDATE SET 
