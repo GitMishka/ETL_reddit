@@ -43,7 +43,7 @@ import datetime
 
 def fetch_data():
     # Fetch the top 100 posts from /r/all
-    posts = reddit.subreddit('all').new(limit=100)
+    posts = reddit.subreddit('all').hot(limit=100)
 
     # Create a list to hold all the posts
     posts_list = []
