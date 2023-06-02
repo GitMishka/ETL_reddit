@@ -1,31 +1,44 @@
-import time
 import praw
 import pandas as pd
+import time
 import psycopg2
-from psycopg2 import sql
+import config  
+import request
 
-# Create a connection to your PostgreSQL database
-conn = psycopg2.connect(
-    dbname="your_db",
-    user="your_username",
-    password="your_password",
-    host="your_host",
-    port="your_port"
-)
-
-# Create a new Reddit instance
+user_agent = config.reddit_username
 reddit = praw.Reddit(
-    client_id="my_client_id",
-    client_secret="my_client_secret",
-    user_agent="my_user_agent",
+    username=config.reddit_username,
+    password=config.reddit_password,
+    client_id=config.reddit_client_id,
+    client_secret=config.reddit_client_secret,
+    user_agent=user_agent,
+    check_for_async=False
 )
+
+conn = psycopg2.connect(
+    host=config.pg_host,
+    database=config.pg_database,
+    user=config.pg_user,
+    password=config.pg_password
+)
+cur = conn.cursor()
+cur.execute("""
+    CREATE TABLE IF NOT EXISTS reddit_posts (
+        post_id TEXT PRIMARY KEY,
+        post_title TEXT,
+        subreddit TEXT,
+        post_upvote_ratio REAL,
+        post_comments INT,
+        post_timeposted TIMESTAMP
+    )
+""")
 
 def fetch_data():
     # Fetch the top 100 posts from /r/all
     posts = reddit.subreddit('all').new(limit=100)
 
-    # Create a DataFrame to hold all the posts
-    posts_df = pd.DataFrame()
+    # Create a list to hold all the posts
+    posts_list = []
 
     for post in posts:
         content = {
@@ -36,17 +49,35 @@ def fetch_data():
             'post_comments': post.num_comments,
             'post_timeposted': post.created_utc,
         }
-        posts_df = posts_df.append(content, ignore_index=True)
+        posts_list.append(content)
     
+    # Convert list of posts into a DataFrame
+    posts_df = pd.DataFrame(posts_list)
     return posts_df
+
+def upsert_post(post):
+    # Upsert post into the PostgreSQL database
+    insert = """
+    INSERT INTO reddit_posts(post_id, post_title, subreddit, post_upvote_ratio, post_comments, post_timeposted) 
+    VALUES(%s, %s, %s, %s, %s, %s) 
+    ON CONFLICT (post_id) 
+    DO UPDATE SET 
+    post_title = excluded.post_title,
+    subreddit = excluded.subreddit,
+    post_upvote_ratio = excluded.post_upvote_ratio,
+    post_comments = excluded.post_comments,
+    post_timeposted = excluded.post_timeposted
+    """
+    cur.execute(insert, post)
 
 while True:
     try:
         # Fetch the data
         df = fetch_data()
 
-        # Upsert the data to your PostgreSQL database
-        df.to_sql('reddit_posts', conn, if_exists='replace', index=False)
+        # Upsert each post into the PostgreSQL database
+        for index, row in df.iterrows():
+            upsert_post(row.tolist())
 
         # Make sure to commit the transaction
         conn.commit()
