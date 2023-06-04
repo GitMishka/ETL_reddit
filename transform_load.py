@@ -29,10 +29,7 @@ conn2 = psycopg2.connect(
     password=config.pg_password
 )
 cur2 = conn2.cursor()
-# After establishing the connection and getting the cursor
-# cur.execute("""
-#     DROP TABLE IF EXISTS reddit_posts;
-# """)
+
 cur2.execute("""
     CREATE TABLE IF NOT EXISTS reddit_posts_hot_summary (     
         subreddit TEXT,
@@ -42,7 +39,6 @@ cur2.execute("""
     );
 """)
 conn2.commit()
-# Run the query on the first database
 cur.execute("""
     SELECT subreddit, AVG(post_upvote_ratio) avg_upvote_ratio
     ,ROUND(AVG(reddit_posts_hot.post_comments)) avg_comment_count
@@ -51,12 +47,10 @@ cur.execute("""
 """)
 rows = cur.fetchall()
 
-# Insert the results into the second database
 for row in rows:
     cur2.execute("""
         INSERT INTO reddit_posts_hot_summary (subreddit, post_upvote_ratio, post_comments, count)
         VALUES (%s, %s, %s, %s)
     """, (row[0], row[1], row[2], row[3]))
-
 conn2.commit()
 

@@ -22,10 +22,7 @@ conn = psycopg2.connect(
     password=config.pg_password
 )
 cur = conn.cursor()
-# After establishing the connection and getting the cursor
-# cur.execute("""
-#     DROP TABLE IF EXISTS reddit_posts;
-# """)
+
 cur.execute("""
     CREATE TABLE IF NOT EXISTS reddit_posts_new (
         post_id TEXT PRIMARY KEY,
@@ -36,16 +33,13 @@ cur.execute("""
         post_timeposted TIMESTAMP
     );
 """)
-conn.commit()  # Explicit commit after table creation
-
+conn.commit()  
 
 import datetime
 
 def fetch_data():
-    # Fetch the top 100 posts from /r/all
     posts = reddit.subreddit('all').new(limit=100)
 
-    # Create a list to hold all the posts
     posts_list = []
 
     for post in posts:
@@ -59,13 +53,11 @@ def fetch_data():
         }
         posts_list.append(content)
     
-    # Convert list of posts into a DataFrame
     posts_df = pd.DataFrame(posts_list)
     return posts_df
 
 
 def upsert_post(post):
-    # Upsert post into the PostgreSQL database
     insert = """
     INSERT INTO reddit_posts_new (post_id, post_title, subreddit, post_upvote_ratio, post_comments, post_timeposted) 
     VALUES(%s, %s, %s, %s, %s, %s) 
@@ -81,22 +73,16 @@ def upsert_post(post):
 
 while True:
     try:
-        # Fetch the data
         df = fetch_data()
 
-        # Upsert each post into the PostgreSQL database
         for index, row in df.iterrows():
             upsert_post(row.tolist())
 
-        # Make sure to commit the transaction
         conn.commit()
 
-        # Wait for a minute
         time.sleep(60)
 
     except Exception as e:
         print(str(e))
-        # If there is an error in the connection, we should roll it back
         conn.rollback()
-        # Wait for a minute before the next fetch
         time.sleep(60)
